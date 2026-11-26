@@ -1,6 +1,6 @@
 # IMU LAB Pro
 
-IMU LAB Pro is a personal side project for experimenting with
+IMU LAB Pro is my personal side project for experimenting with
 real-time sensor acquisition, vibration signals, engineering analysis, and 3D
 visualization in Python.
 
@@ -18,6 +18,16 @@ experimental work in progress rather than a production measurement system.
 
 The aircraft view is only a sensor-fusion visualization experiment. It is not
 intended to represent a validated aircraft model or simulation.
+
+## Screenshots
+
+### Live signal analysis
+
+![IMU LAB Pro live acceleration, gyroscope, and PSD dashboard](screenshot/UI.png)
+
+### 3D orientation demonstration
+
+![IMU-controlled Rafale orientation view](screenshot/rafale.png)
 
 ## Installation
 

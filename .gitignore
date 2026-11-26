@@ -13,4 +13,6 @@ venv/
 /data/processed/*
 !/data/processed/README.md
 *.png
+!/screenshot/
+!/screenshot/*.png
 *.log

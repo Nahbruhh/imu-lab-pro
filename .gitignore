@@ -1,18 +1,73 @@
+# Python caches and test output
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .cache/
-/README.private.md
 .coverage
 htmlcov/
+
+# Virtual environments and packaging output
 .venv/
 venv/
+build/
+dist/
+*.egg-info/
+
+# Private notes, historical prototypes, and local configuration
+/README.private.md
+/archive/
+.env
+.env.*
+!.env.example
+.secrets/
+secrets/
+*.local
+*.local.*
+/projects/**/calibration/private/
+/projects/**/*.local.yaml
+/projects/**/*.local.yml
+
+# Editor and operating-system metadata
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.bak
+*.tmp
+~$*
+
+# Local measurement and generated analysis data
 /imu_*.csv
 /data/raw/*
 !/data/raw/README.md
 /data/processed/*
 !/data/processed/README.md
+
+# Generated solver databases and results; keep reviewed inputs such as .inp
+*.rst
+*.rth
+*.full
+*.emat
+*.esav
+*.db
+*.mechdb
+*.wbpj
+*.wbjn
+*.frd
+*.sta
+*.cvg
+*.odb
+*.sim
+/projects/**/results/
+/projects/**/work/
+/projects/**/reports/generated/
+
+# Generated images, except reviewed public screenshots
 *.png
 !/screenshot/
 !/screenshot/*.png
+
+# Logs
 *.log

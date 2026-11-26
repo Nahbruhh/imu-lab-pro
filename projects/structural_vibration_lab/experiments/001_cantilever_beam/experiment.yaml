@@ -1,7 +1,9 @@
 project:
-  name: Cantilever Beam Digital Twin
+  id: "001"
+  name: Cantilever Beam Vibration
   type: structural_validation
   schema_version: 1
+  status: planning
 
 specimen:
   geometry:

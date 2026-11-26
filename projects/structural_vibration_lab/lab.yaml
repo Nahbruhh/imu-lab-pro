@@ -1,0 +1,16 @@
+lab:
+  name: Structural Vibration Lab
+  schema_version: 1
+  software_package: imu_lab_pro
+  unit_system: SI
+
+data_policy:
+  raw_data_root: ../../data/raw
+  processed_data_root: ../../data/processed
+  publish_only_sanitized_examples: true
+
+experiments:
+  - id: "001"
+    name: Cantilever beam vibration
+    path: experiments/001_cantilever_beam
+    status: planning

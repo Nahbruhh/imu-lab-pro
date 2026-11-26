@@ -19,6 +19,13 @@ experimental work in progress rather than a production measurement system.
 The aircraft view is only a sensor-fusion visualization experiment. It is not
 intended to represent a validated aircraft model or simulation.
 
+## Project experiments
+
+- [Structural Vibration Lab](projects/structural_vibration_lab/) — organizing
+  repeatable structural-dynamics experiments, beginning with a cantilever beam.
+- [Rafale orientation](projects/rafale_orientation/) — IMU sensor-fusion and
+  interactive 3D orientation demonstration.
+
 ## Screenshots
 
 ### Live signal analysis

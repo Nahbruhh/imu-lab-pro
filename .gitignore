@@ -1,11 +1,16 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.cache/
+/README.private.md
 .coverage
 htmlcov/
 .venv/
 venv/
 /imu_*.csv
-/samples/*.csv
+/data/raw/*
+!/data/raw/README.md
+/data/processed/*
+!/data/processed/README.md
 *.png
 *.log

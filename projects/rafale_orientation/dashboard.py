@@ -17,9 +17,10 @@ from pyvistaqt import QtInteractor
 import trimesh
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_ROOT = PROJECT_ROOT / 'src'
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 from imu_lab_pro.orientation import (  # noqa: E402
     AXIS_VECTORS,
@@ -99,8 +100,7 @@ class Aircraft(QtWidgets.QWidget):
         return m
 
     def load_model(self):
-        path = (Path(__file__).resolve().parents[1]
-                / 'assets' / 'models' / 'rafale_style.glb')
+        path = Path(__file__).resolve().parent / 'models' / 'rafale_style.glb'
         if not path.exists():
             raise FileNotFoundError(f'Missing aircraft GLB: {path}')
         scene = trimesh.load(str(path), force='scene')

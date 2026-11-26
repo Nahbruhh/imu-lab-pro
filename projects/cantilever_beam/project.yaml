@@ -1,0 +1,25 @@
+project:
+  name: Cantilever Beam Digital Twin
+  type: structural_validation
+  schema_version: 1
+
+specimen:
+  geometry:
+    length_m: null
+    width_m: null
+    thickness_m: null
+  material:
+    name: null
+    elastic_modulus_pa: null
+    density_kg_m3: null
+    poisson_ratio: null
+
+measurement:
+  sensor_id: null
+  position_m: null
+  calibration_file: null
+
+models:
+  analytical: null
+  fea: null
+  reduced_order: null

@@ -5,8 +5,7 @@ import pyvista as pv
 
 from pathlib import Path
 
-MODEL = (Path(__file__).resolve().parents[1]
-         / "assets" / "models" / "rafale_style.glb")
+MODEL = Path(__file__).resolve().parent / "models" / "rafale_style.glb"
 
 # Load GLB model
 scene = trimesh.load(str(MODEL), force="scene")

@@ -3,4 +3,4 @@
 import runpy
 
 
-runpy.run_module("imu_lab_pro.app", run_name="__main__")
+runpy.run_module("imu_lab_pro.ui.application", run_name="__main__")

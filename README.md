@@ -1,25 +1,49 @@
-# IMU LAB Pro v2
+# IMU LAB Pro
 
-Engineering dashboard for an ESP32-S3 and MPU6050 connected over USB serial.
+IMU LAB Pro is a personal side project for experimenting with
+real-time sensor acquisition, vibration signals, engineering analysis, and 3D
+visualization in Python.
 
-## Repository layout
+The current setup uses an ESP32-S3 and MPU6050 over USB serial. It is an
+experimental work in progress rather than a production measurement system.
 
-```text
-imu_lab_pro/                 Canonical Python application package
-firmware/imu_stream_pro_v2/ Canonical Arduino sketch
-assets/models/              Rafale GLB and OBJ assets
-samples/                    Captured measurement examples
-tools/                      Experimental and manual diagnostic utilities
-tests/                      Automated test suite
-archive/                    Historical source retained for reference
-dashboard.py                Backward-compatible launcher
+## Current features
+
+- Live accelerometer and gyroscope plots
+- Configurable sensor ranges, sample cadence, and digital filtering
+- FFT/PSD-style frequency analysis
+- CSV recording and basic acquisition diagnostics
+- IMU orientation estimation and mounting-axis configuration
+- Optional 3D Rafale orientation demonstration
+
+The aircraft view is only a sensor-fusion visualization experiment. It is not
+intended to represent a validated aircraft model or simulation.
+
+## Installation
+
+Python 3.10 or newer is recommended.
+
+```powershell
+py -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-The supported application is `imu_lab_pro/app.py`. The PyVista Rafale
-dashboard in `tools/` remains experimental until it is integrated into the
-canonical application.
+Install the optional 3D dependencies with:
 
-## Wiring
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[3d,dev]"
+```
+
+## Firmware
+
+The Arduino sketch is located at:
+
+```text
+firmware/esp32_s3_mpu6050/esp32_s3_mpu6050.ino
+```
+
+Default wiring:
 
 | MPU6050 | ESP32-S3 |
 |---|---|
@@ -28,64 +52,39 @@ canonical application.
 | SDA | GPIO5 |
 | SCL | GPIO4 |
 
-## Installation
+## Run
 
-1. Upload `firmware/imu_stream_pro_v2/imu_stream_pro_v2.ino` using Arduino IDE.
-2. Close Arduino Serial Monitor and Serial Plotter.
-3. Install the application dependencies:
-
-   ```powershell
-   py -m pip install -r requirements.txt
-   ```
-
-4. Run either supported launcher:
-
-   ```powershell
-   py -m imu_lab_pro --port COM4
-   # or, for compatibility
-   py dashboard.py --port COM4
-   ```
-
-The default serial rate is 460800 baud.
-
-## Experimental Rafale dashboard
-
-The former `dashboard_ap.py` is preserved as
-`tools/rafale_dashboard_experimental.py`. It uses PyVista/VTK to render the
-Rafale model and requires the optional 3D dependencies:
+Close the Arduino Serial Monitor before connecting.
 
 ```powershell
-py -m pip install -r requirements-3d.txt
-py tools\rafale_dashboard_experimental.py --port COM4
+.venv\Scripts\python.exe -m imu_lab_pro --port COM4
 ```
 
-Replace `COM4` with the ESP32-S3 serial port. The default baud rate is 460800;
-it can be overridden with `--baud`.
+Replace `COM4` with the correct serial port.
 
-The Rafale display uses a right-handed aircraft frame: +X forward, +Y left,
-and +Z up. Keep the sensor still for at least two seconds after connecting so
-the dashboard can estimate gyroscope bias. The **Level / zero** action is
-rejected until that stationary calibration has completed.
-
-If the MPU6050 axes are not mounted as +X toward the nose and +Z toward the
-aircraft top, specify the signed sensor axes. For example, when sensor +Y
-points forward and sensor +Z points upward:
+For the optional Rafale view:
 
 ```powershell
-py tools\rafale_dashboard_experimental.py --port COM4 --sensor-forward +Y --sensor-up +Z
+.venv\Scripts\python.exe projects\rafale_orientation\dashboard.py --port COM4
 ```
 
-The forward and up selections must be perpendicular.
+Keep the sensor stationary for a few seconds after connecting so the initial
+gyroscope bias can be estimated.
 
-## Measurement limitations
+## Tests
 
-- Available gyro ranges are ±250, ±500, ±1000, and ±2000 °/s.
-- Available accelerometer ranges are ±2, ±4, ±8, and ±16 g.
-- Acquisition currently uses scheduled I²C polling, not a verified MPU6050
-  data-ready or FIFO acquisition path.
-- Missing serial sequence IDs do not independently prove missing MPU6050
-  internal samples.
-- Measurements currently include sensor bias, scale error, gravity, and
-  mounting alignment error. Calibration work is part of Phase 2.
-- Effective bandwidth depends on the selected digital low-pass filter.
-- Hardware validation results must be supported by captured test evidence.
+```powershell
+.venv\Scripts\python.exe -m pytest
+```
+
+## Notes
+
+- Local measurement captures are excluded from Git.
+- Sensor output still contains real-world noise, bias, mounting error, and
+  hardware limitations.
+- Results should not be treated as calibrated engineering measurements unless
+  the relevant validation procedure has been completed.
+- Hardware-dependent behavior may differ from software-only tests.
+
+This repository is mainly a place for incremental experiments and personal
+engineering practice.

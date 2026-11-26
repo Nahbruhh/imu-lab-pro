@@ -71,6 +71,22 @@ def test_stationary_window_calibrates_gyro_bias():
     assert_vector(state.gyro_bias_dps, bias)
 
 
+def test_stationary_window_accepts_large_constant_sensor_bias():
+    estimator = AttitudeEstimator(bias_duration_s=0.2)
+    bias = np.array([7.0, -6.0, 5.0])
+    state = None
+    for index in range(30):
+        state = estimator.update(
+            index * 10_000,
+            np.array([0.0, 0.0, 1.0]),
+            bias,
+        )
+    assert state is not None
+    assert state.bias_ready
+    assert state.stationary
+    assert_vector(state.gyro_bias_dps, bias)
+
+
 def test_motion_restarts_startup_bias_calibration():
     estimator = AttitudeEstimator(bias_duration_s=0.2)
     for index in range(15):

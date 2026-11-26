@@ -115,6 +115,13 @@ class AttitudeEstimator:
         self._bias_start_us: int | None = None
         self._bias_sum = np.zeros(3)
         self._bias_count = 0
+        self._bias_accel_reference: np.ndarray | None = None
+
+    def _reset_bias_window(self) -> None:
+        self._bias_start_us = None
+        self._bias_sum.fill(0.0)
+        self._bias_count = 0
+        self._bias_accel_reference = None
 
     @staticmethod
     def _elapsed_us(current: int, previous: int) -> int:
@@ -124,17 +131,40 @@ class AttitudeEstimator:
                      gyro_sensor_dps: np.ndarray) -> None:
         if self.bias_ready:
             return
-        candidate = (
-            abs(float(np.linalg.norm(acceleration)) - 1.0) <= 0.08
-            and float(np.linalg.norm(gyro_sensor_dps)) <= 5.0
+        acceleration_norm = float(np.linalg.norm(acceleration))
+        finite = (
+            np.all(np.isfinite(acceleration))
+            and np.all(np.isfinite(gyro_sensor_dps))
         )
+        plausible = (
+            finite
+            and abs(acceleration_norm - 1.0) <= 0.08
+            and float(np.linalg.norm(gyro_sensor_dps)) <= 30.0
+        )
+        mean_gyro = (
+            self._bias_sum / self._bias_count
+            if self._bias_count else gyro_sensor_dps
+        )
+        gyro_stable = (
+            self._bias_count < 5
+            or float(np.linalg.norm(gyro_sensor_dps - mean_gyro)) <= 2.5
+        )
+        acceleration_unit = (
+            acceleration / acceleration_norm
+            if acceleration_norm > 1e-9 else acceleration
+        )
+        gravity_stable = (
+            self._bias_accel_reference is None
+            or float(np.dot(acceleration_unit, self._bias_accel_reference))
+            >= math.cos(math.radians(3.0))
+        )
+        candidate = plausible and gyro_stable and gravity_stable
         if not candidate:
-            self._bias_start_us = None
-            self._bias_sum.fill(0.0)
-            self._bias_count = 0
+            self._reset_bias_window()
             return
         if self._bias_start_us is None:
             self._bias_start_us = int(t_us)
+            self._bias_accel_reference = acceleration_unit.copy()
         self._bias_sum += gyro_sensor_dps
         self._bias_count += 1
         elapsed = self._elapsed_us(t_us, self._bias_start_us) * 1e-6
@@ -153,8 +183,8 @@ class AttitudeEstimator:
         corrected_sensor_gyro = gyro_sensor - self.gyro_bias_dps
         gyro_aircraft_dps = self.sensor_to_aircraft.apply(corrected_sensor_gyro)
         stationary = self.bias_ready and (
-            abs(acceleration_norm - 1.0) <= 0.05
-            and float(np.linalg.norm(gyro_aircraft_dps)) <= 1.0
+            abs(acceleration_norm - 1.0) <= 0.08
+            and float(np.linalg.norm(gyro_aircraft_dps)) <= 1.5
         )
 
         if not self.initialized and acceleration_norm > 1e-9:

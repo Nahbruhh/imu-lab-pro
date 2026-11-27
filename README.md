@@ -38,6 +38,10 @@ intended to represent a validated aircraft model or simulation.
 
 ![IMU-controlled Rafale orientation view](screenshot/rafale.png)
 
+### Rafale Rush
+
+![Rafale Rush controlled by IMU pitch and forward-thrust gestures](screenshot/rafale%20rush.png)
+
 ## Installation
 
 Python 3.10 or newer is recommended.
@@ -85,6 +89,12 @@ For the optional Rafale view:
 
 ```powershell
 .venv\Scripts\python.exe projects\rafale_orientation\dashboard.py --port COM4
+```
+
+For the IMU-controlled Rafale Rush game:
+
+```powershell
+.venv\Scripts\python.exe projects\physics_arcade\games\001_rafale_rush\game.py --port COM4
 ```
 
 Keep the sensor stationary for a few seconds after connecting so the initial

@@ -1,4 +1,4 @@
-"""Pure control and collision physics for Flappy Rafale."""
+"""Pure control, boost detection, and collision physics for Rafale Rush."""
 
 from dataclasses import dataclass
 import math
@@ -19,6 +19,52 @@ class PitchControlSettings:
     full_command_deg: float = 20.0
     maximum_speed_px_s: float = 270.0
     response_time_s: float = 0.16
+
+
+@dataclass(frozen=True)
+class BoostSettings:
+    trigger_g: float = 0.30
+    release_g: float = 0.10
+    filter_time_s: float = 0.035
+    duration_s: float = 1.0
+    cooldown_s: float = 1.4
+
+
+class BoostDetector:
+    """Detect a filtered forward-thrust gesture with hysteresis and cooldown."""
+
+    def __init__(self, settings: BoostSettings | None = None):
+        self.settings = settings or BoostSettings()
+        self.reset()
+
+    def reset(self) -> None:
+        self.filtered_g = 0.0
+        self.last_time_s: float | None = None
+        self.cooldown_until_s = 0.0
+        self.armed = True
+
+    def update(self, forward_g: float, now_s: float) -> bool:
+        if not math.isfinite(forward_g) or not math.isfinite(now_s):
+            return False
+        if self.last_time_s is None:
+            dt_s = 0.0
+        else:
+            dt_s = clamp(now_s - self.last_time_s, 0.0, 0.1)
+        self.last_time_s = now_s
+        if dt_s > 0.0:
+            alpha = 1.0 - math.exp(
+                -dt_s / max(self.settings.filter_time_s, 1e-6))
+            self.filtered_g += alpha * (forward_g - self.filtered_g)
+
+        if self.filtered_g <= self.settings.release_g:
+            self.armed = True
+        if (self.armed
+                and self.filtered_g >= self.settings.trigger_g
+                and now_s >= self.cooldown_until_s):
+            self.armed = False
+            self.cooldown_until_s = now_s + self.settings.cooldown_s
+            return True
+        return False
 
 
 def pitch_command(current_pitch_deg: float, neutral_pitch_deg: float,

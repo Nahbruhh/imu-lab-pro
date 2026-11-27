@@ -26,7 +26,7 @@ intended to represent a validated aircraft model or simulation.
 - [Rafale orientation](projects/rafale_orientation/) — IMU sensor-fusion and
   interactive 3D orientation demonstration.
 - [Physics Arcade](projects/physics_arcade/) — small physical-interface games,
-  beginning with an IMU pitch-controlled Flappy Rafale.
+  beginning with the IMU tilt-and-thrust controlled Rafale Rush.
 
 ## Screenshots
 

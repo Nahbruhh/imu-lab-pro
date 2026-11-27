@@ -1,4 +1,4 @@
-"""Flappy Rafale: a simple IMU pitch-controlled PySide6 game."""
+"""Rafale Rush: an IMU tilt-and-thrust controlled PySide6 game."""
 
 import argparse
 from dataclasses import dataclass
@@ -25,6 +25,8 @@ from imu_lab_pro.orientation import (  # noqa: E402
     sensor_mount_rotation,
 )
 from physics import (  # noqa: E402
+    BoostDetector,
+    BoostSettings,
     PitchControlSettings,
     circle_hits_gate,
     clamp,
@@ -34,7 +36,7 @@ from physics import (  # noqa: E402
 
 
 class ImuInput(QtCore.QObject):
-    attitude_changed = QtCore.Signal(float, bool, bool, str)
+    attitude_changed = QtCore.Signal(float, float, bool, bool, str)
     connection_changed = QtCore.Signal(bool, str)
 
     def __init__(self, mounting, baud: int = 460800, parent=None):
@@ -132,9 +134,18 @@ class ImuInput(QtCore.QObject):
         acceleration = np.array([ax, ay, az], dtype=float) / accel_scale
         gyro = np.array([gx, gy, gz], dtype=float) / gyro_scale
         state = self.estimator.update(t_us, acceleration, gyro)
+        acceleration_aircraft = self.estimator.sensor_to_aircraft.apply(
+            acceleration)
+        predicted_gravity_aircraft = state.orientation.inv().apply(
+            np.array([0.0, 0.0, 1.0]))
+        # An accelerometer measures specific force, so an intentional forward
+        # thrust normally appears with the opposite sign on the forward axis.
+        forward_linear_g = -float(
+            (acceleration_aircraft - predicted_gravity_aircraft)[0])
         self.last_data_time = time.monotonic()
         self.attitude_changed.emit(
-            state.pitch_deg, state.bias_ready, state.stationary, state.status)
+            state.pitch_deg, forward_linear_g, state.bias_ready,
+            state.stationary, state.status)
 
 
 @dataclass
@@ -164,13 +175,18 @@ class GameCanvas(QtWidgets.QWidget):
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self.settings = PitchControlSettings()
         self.current_pitch = 0.0
+        self.forward_acceleration_g = 0.0
         self.neutral_pitch = None
         self.relative_pitch = 0.0
         self.command = 0.0
         self.plane_x = 170.0
         self.plane_y = 240.0
         self.vertical_speed = 0.0
-        self.scroll_speed = 225.0
+        self.base_scroll_speed = 225.0
+        self.boost_scroll_speed = 360.0
+        self.boost_duration_s = BoostSettings().duration_s
+        self.boost_remaining_s = 0.0
+        self.invert_pitch = False
         self.gate_spacing = 390.0
         self.gates = []
         self.score = 0
@@ -186,6 +202,16 @@ class GameCanvas(QtWidgets.QWidget):
     def set_pitch(self, pitch_deg: float) -> None:
         self.current_pitch = float(pitch_deg)
 
+    def set_forward_acceleration(self, acceleration_g: float) -> None:
+        self.forward_acceleration_g = float(acceleration_g)
+
+    def set_invert_pitch(self, inverted: bool) -> None:
+        self.invert_pitch = bool(inverted)
+
+    def activate_boost(self) -> None:
+        if self.running:
+            self.boost_remaining_s = self.boost_duration_s
+
     def capture_neutral(self) -> None:
         self.neutral_pitch = self.current_pitch
         self.relative_pitch = 0.0
@@ -197,6 +223,7 @@ class GameCanvas(QtWidgets.QWidget):
         self.relative_pitch = 0.0
         self.command = 0.0
         self.vertical_speed = 0.0
+        self.boost_remaining_s = 0.0
         self.update()
 
     def reset_game(self) -> None:
@@ -235,12 +262,22 @@ class GameCanvas(QtWidgets.QWidget):
         if self.neutral_pitch is not None:
             self.command, self.relative_pitch = pitch_command(
                 self.current_pitch, self.neutral_pitch, self.settings)
+            if self.invert_pitch:
+                self.command = -self.command
+                self.relative_pitch = -self.relative_pitch
         self.vertical_speed = update_vertical_speed(
             self.vertical_speed, self.command, dt, self.settings)
         self.plane_y += self.vertical_speed * dt
 
+        self.boost_remaining_s = max(0.0, self.boost_remaining_s - dt)
+        scroll_speed = (
+            self.boost_scroll_speed
+            if self.boost_remaining_s > 0.0
+            else self.base_scroll_speed
+        )
+
         for gate in self.gates:
-            gate.x -= self.scroll_speed * dt
+            gate.x -= scroll_speed * dt
             if not gate.scored and gate.x + gate.width < self.plane_x:
                 gate.scored = True
                 self.score += 1
@@ -331,6 +368,13 @@ class GameCanvas(QtWidgets.QWidget):
         path.closeSubpath()
 
         painter.setPen(QtGui.QPen(QtGui.QColor("#e5e7eb"), 2))
+        if self.boost_remaining_s > 0.0:
+            trail = QtGui.QLinearGradient(-70.0, 0.0, -25.0, 0.0)
+            trail.setColorAt(0.0, QtGui.QColor(56, 189, 248, 0))
+            trail.setColorAt(1.0, QtGui.QColor("#38bdf8"))
+            painter.setPen(QtGui.QPen(QtGui.QBrush(trail), 7))
+            painter.drawLine(QtCore.QPointF(-70.0, 0.0), QtCore.QPointF(-29.0, 0.0))
+            painter.setPen(QtGui.QPen(QtGui.QColor("#e5e7eb"), 2))
         painter.setBrush(QtGui.QColor("#6b7280"))
         painter.drawPath(path)
         painter.setBrush(QtGui.QColor("#67e8f9"))
@@ -353,6 +397,19 @@ class GameCanvas(QtWidgets.QWidget):
             18, 53,
             f"Pitch {self.current_pitch:+.1f}°   Neutral {neutral}   "
             f"Relative {self.relative_pitch:+.1f}°")
+        painter.drawText(
+            18, 74, f"Forward thrust {self.forward_acceleration_g:+.2f} g")
+        if self.boost_remaining_s > 0.0:
+            painter.setPen(QtGui.QColor("#67e8f9"))
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(self.width() - 105, 30, "BOOST")
+            fraction = clamp(
+                self.boost_remaining_s / max(self.boost_duration_s, 1e-6),
+                0.0, 1.0)
+            painter.fillRect(
+                QtCore.QRectF(self.width() - 110, 39, 90 * fraction, 7),
+                QtGui.QColor("#38bdf8"))
 
     def _draw_center_message(self, painter: QtGui.QPainter) -> None:
         if self.game_over:
@@ -381,7 +438,7 @@ class GameCanvas(QtWidgets.QWidget):
 class GameWindow(QtWidgets.QWidget):
     def __init__(self, args):
         super().__init__()
-        self.setWindowTitle("Physics Arcade | Flappy Rafale")
+        self.setWindowTitle("Physics Arcade | Rafale Rush")
         self.resize(1120, 700)
 
         mounting = sensor_mount_rotation(args.sensor_forward, args.sensor_up)
@@ -389,6 +446,8 @@ class GameWindow(QtWidgets.QWidget):
         self.bias_ready = False
         self.sensor_stationary = False
         self.current_pitch = 0.0
+        self.forward_acceleration_g = 0.0
+        self.boost_detector = BoostDetector()
 
         root = QtWidgets.QVBoxLayout(self)
         controls = QtWidgets.QHBoxLayout()
@@ -400,6 +459,8 @@ class GameWindow(QtWidgets.QWidget):
         self.neutral_button = QtWidgets.QPushButton("Set neutral")
         self.start_button = QtWidgets.QPushButton("Start")
         self.restart_button = QtWidgets.QPushButton("Restart")
+        self.invert_pitch = QtWidgets.QCheckBox("Invert pitch")
+        self.invert_boost = QtWidgets.QCheckBox("Invert boost")
         self.score_label = QtWidgets.QLabel("Score: 0")
         self.neutral_button.setToolTip(
             "Available after the first valid IMU sample")
@@ -414,6 +475,8 @@ class GameWindow(QtWidgets.QWidget):
             ("", self.neutral_button),
             ("", self.start_button),
             ("", self.restart_button),
+            ("", self.invert_pitch),
+            ("", self.invert_boost),
         ):
             if label:
                 controls.addWidget(QtWidgets.QLabel(label))
@@ -432,6 +495,7 @@ class GameWindow(QtWidgets.QWidget):
         self.neutral_button.clicked.connect(self._set_neutral)
         self.start_button.clicked.connect(self._toggle_start)
         self.restart_button.clicked.connect(self._restart)
+        self.invert_pitch.toggled.connect(self.canvas.set_invert_pitch)
         self.imu.attitude_changed.connect(self._attitude_changed)
         self.imu.connection_changed.connect(self._connection_changed)
         self.canvas.score_changed.connect(
@@ -462,6 +526,7 @@ class GameWindow(QtWidgets.QWidget):
         self.status.setText(message)
         self.canvas.set_running(False)
         self.canvas.clear_neutral()
+        self.boost_detector.reset()
         self.start_button.setText("Start")
         self.neutral_button.setEnabled(False)
         self.start_button.setEnabled(False)
@@ -469,13 +534,23 @@ class GameWindow(QtWidgets.QWidget):
             self.bias_ready = False
             self.sensor_stationary = False
 
-    def _attitude_changed(self, pitch: float, bias_ready: bool,
+    def _attitude_changed(self, pitch: float, forward_acceleration_g: float,
+                          bias_ready: bool,
                           stationary: bool,
                           estimator_status: str) -> None:
         self.current_pitch = pitch
+        self.forward_acceleration_g = (
+            -forward_acceleration_g
+            if self.invert_boost.isChecked()
+            else forward_acceleration_g
+        )
         self.bias_ready = bias_ready
         self.sensor_stationary = stationary
         self.canvas.set_pitch(pitch)
+        self.canvas.set_forward_acceleration(self.forward_acceleration_g)
+        if self.canvas.running and self.boost_detector.update(
+                self.forward_acceleration_g, time.monotonic()):
+            self.canvas.activate_boost()
         self.neutral_button.setEnabled(
             self.imu.connected and self.imu.last_data_time is not None)
         self.start_button.setEnabled(
@@ -504,6 +579,7 @@ class GameWindow(QtWidgets.QWidget):
             self.status.setText("Waiting for a current IMU sample")
             return
         self.canvas.capture_neutral()
+        self.boost_detector.reset()
         self.start_button.setEnabled(True)
         calibration_note = "" if self.bias_ready else " (gyro calibration continues)"
         self.status.setText(
@@ -522,6 +598,8 @@ class GameWindow(QtWidgets.QWidget):
             self.status.setText("Waiting for current IMU data")
             return
         running = not self.canvas.running
+        if running:
+            self.boost_detector.reset()
         self.canvas.set_running(running)
         self.start_button.setText("Pause" if running else "Start")
         self.status.setText("Flying" if running else "Paused")
@@ -529,6 +607,7 @@ class GameWindow(QtWidgets.QWidget):
     def _restart(self) -> None:
         self.canvas.set_running(False)
         self.canvas.reset_game()
+        self.boost_detector.reset()
         self.start_button.setText("Start")
         self.status.setText("Ready with the current neutral pitch")
 

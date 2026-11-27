@@ -9,7 +9,7 @@ MODULE_PATH = (
     / "projects"
     / "physics_arcade"
     / "games"
-    / "001_flappy_rafale"
+    / "001_rafale_rush"
     / "physics.py"
 )
 SPEC = importlib.util.spec_from_file_location("flappy_rafale_physics", MODULE_PATH)
@@ -62,3 +62,25 @@ def test_gate_collision_respects_open_gap():
         gap_top=150.0,
         gap_bottom=250.0,
     )
+
+
+def test_forward_thrust_triggers_one_boost_until_release_and_cooldown():
+    settings = physics.BoostSettings(
+        trigger_g=0.25,
+        release_g=0.08,
+        filter_time_s=0.01,
+        cooldown_s=1.0,
+    )
+    detector = physics.BoostDetector(settings)
+    assert not detector.update(0.0, 0.00)
+    assert detector.update(0.40, 0.05)
+    assert not detector.update(0.45, 0.10)
+    assert not detector.update(0.0, 0.20)
+    assert not detector.update(0.40, 0.50)
+    detector.update(0.0, 1.10)
+    assert detector.update(0.40, 1.20)
+
+
+def test_boost_detector_ignores_non_finite_input():
+    detector = physics.BoostDetector()
+    assert not detector.update(float("nan"), 0.0)
